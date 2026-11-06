@@ -1,0 +1,2806 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Alexa Routine Remote — Command Deck</title>
+
+  <!-- PWA & Mobile Standalone App Meta Tags (GitHub Pages Subfolder Compatible) -->
+  <meta name="theme-color" content="#0b1120" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Alexa Deck" />
+  <meta name="application-name" content="Alexa Deck" />
+  <link rel="manifest" id="pwaManifestLink" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%230b1120'/%3E%3Ccircle cx='256' cy='256' r='168' fill='none' stroke='%2306b6d4' stroke-width='36'/%3E%3Ccircle cx='256' cy='256' r='56' fill='%2338bdf8'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%230b1120'/%3E%3Ccircle cx='256' cy='256' r='168' fill='none' stroke='%2306b6d4' stroke-width='36'/%3E%3Ccircle cx='256' cy='256' r='56' fill='%2338bdf8'/%3E%3C/svg%3E" />
+
+  <!-- Baked Default Configuration Slot (Populated when exported via GitHub Kit) -->
+  <script id="bakedConfigData" type="application/json">{}</script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              850: '#152033',
+              925: '#0b1120',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Hardware Remote Styling & Tactile Micro-interactions */
+    body {
+      background-color: #0b1120;
+      background-image: 
+        radial-gradient(at 15% 10%, rgba(6, 182, 212, 0.08) 0px, transparent 45%),
+        radial-gradient(at 85% 90%, rgba(99, 102, 241, 0.08) 0px, transparent 45%);
+      color: #f8fafc;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* Subtle hardware grid texture */
+    .hardware-grid {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    }
+
+    /* Tactile Remote Tile */
+    .remote-tile {
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                  box-shadow 0.2s ease, 
+                  border-color 0.2s ease,
+                  background-color 0.2s ease;
+      box-shadow: 
+        0 6px 16px -4px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .remote-tile:hover {
+      transform: translateY(-2px);
+    }
+
+    .remote-tile:active:not(.edit-mode-active) {
+      transform: scale(0.96) translateY(1px);
+    }
+
+    /* Pulse ring when firing */
+    @keyframes firePulse {
+      0% {
+        box-shadow: 0 0 0 0 var(--glow-color, rgba(34, 211, 238, 0.65));
+      }
+      70% {
+        box-shadow: 0 0 0 14px rgba(34, 211, 238, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+      }
+    }
+
+    .tile-firing {
+      animation: firePulse 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Hide scrollbar for category pills on mobile */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans hardware-grid antialiased selection:bg-cyan-500 selection:text-slate-950">
+
+  <!-- TOP NAVIGATION / COMMAND HEADER -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-900/85 border-b border-slate-800/90 shadow-lg">
+    <div class="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-2">
+      
+      <!-- Brand & Status Indicator -->
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/40 flex items-center justify-center shadow-inner shrink-0">
+          <!-- Alexa-inspired Ring + Signal SVG -->
+          <svg class="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 3v2M12 19v2M3 12h2M19 12h2"></path>
+          </svg>
+        </div>
+        <div class="truncate">
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white truncate">Alexa Routine Deck</h1>
+            <span id="connectionBadge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="connectionBadgeText">Ready</span>
+            </span>
+          </div>
+          <p id="headerSubStatus" class="text-xs text-slate-400 truncate">Voice Monkey v3 &amp; URL Routine Trigger</p>
+        </div>
+      </div>
+
+      <!-- Control Bar Actions -->
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <!-- Install PWA Button (Shown when installable or on mobile) -->
+        <button id="btnInstallPwa" onclick="triggerPwaInstall()" title="Install as Standalone App"
+          class="hidden px-2.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition flex items-center gap-1.5 text-xs font-semibold shadow-sm">
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 3v12"></path>
+            <path d="m8 11 4 4 4-4"></path>
+            <path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"></path>
+          </svg>
+          <span class="hidden md:inline">Install App</span>
+        </button>
+
+        <!-- Sound Effects Toggle -->
+        <button id="btnToggleSound" onclick="toggleSoundEffects()" title="Toggle Tactile Click Sound"
+          class="p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 text-slate-300 border border-slate-700/80 transition flex items-center justify-center">
+          <svg id="iconSoundOn" class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg id="iconSoundOff" class="w-4 h-4 text-slate-500 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
+
+        <!-- Toggle Live TTS Announcer Bar -->
+        <button id="btnToggleTTS" onclick="toggleTTSPanel()" 
+          class="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 text-slate-200 border border-slate-700/80 transition flex items-center gap-1.5 text-xs sm:text-sm font-medium">
+          <svg class="w-4 h-4 text-violet-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+          <span class="hidden sm:inline">Announce</span>
+          <span class="sm:hidden">TTS</span>
+        </button>
+
+        <!-- Toggle Edit Layout Mode -->
+        <button id="btnEditMode" onclick="toggleEditMode()" 
+          class="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 text-slate-200 border border-slate-700/80 transition flex items-center gap-1.5 text-xs sm:text-sm font-medium">
+          <svg class="w-4 h-4 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          <span id="editModeLabel">Edit</span>
+        </button>
+
+        <!-- Build Android APK Studio Button -->
+        <button onclick="openApkModal()" title="Build Standalone Android APK"
+          class="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 transition flex items-center gap-1.5 text-xs sm:text-sm font-semibold shadow-sm">
+          <span>📱</span>
+          <span class="hidden sm:inline">Build APK</span>
+        </button>
+
+        <!-- GitHub Pages & PWA Export Kit Button -->
+        <button onclick="openGithubModal()" title="Export GitHub Pages & PWA Kit"
+          class="px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/35 transition flex items-center gap-1.5 text-xs sm:text-sm font-semibold">
+          <span>📦</span>
+          <span class="hidden lg:inline">GitHub Export</span>
+        </button>
+
+        <!-- Quick Guide Modal Button -->
+        <button onclick="openModal('guideModal')" title="Quick Setup Guide"
+          class="p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 text-slate-300 border border-slate-700/80 transition">
+          <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+
+        <!-- Global Settings & Backup Modal Button -->
+        <button onclick="openSettingsModal()" title="API Keys & Backup Settings"
+          class="p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 text-slate-300 border border-slate-700/80 transition relative">
+          <svg class="w-4 h-4 text-slate-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- COLLAPSIBLE VOICE MONKEY LIVE TTS ANNOUNCER BAR -->
+    <div id="ttsDrawer" class="hidden border-t border-slate-800/90 bg-slate-900/95 transition-all">
+      <div class="max-w-6xl mx-auto px-3 sm:px-6 py-3.5">
+        <div class="p-3.5 rounded-2xl bg-gradient-to-r from-violet-950/40 via-slate-900 to-slate-900 border border-violet-500/30 shadow-inner">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-300 border border-violet-500/30 text-[11px] font-semibold uppercase tracking-wider">Voice Monkey v3 TTS</span>
+              <span class="text-xs text-slate-300 font-medium">Broadcast Live Speech to Echo Speaker</span>
+            </div>
+            <button onclick="openSettingsModal()" class="text-xs text-violet-400 hover:text-violet-300 underline">
+              Manage Speakers &amp; Token
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5">
+            <!-- Speaker Selector / Custom Device Input -->
+            <div class="md:col-span-4 flex gap-1.5">
+              <select id="ttsSpeakerSelect" onchange="handleSpeakerSelectChange()" 
+                class="w-full px-3 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-xs sm:text-sm text-slate-100 focus:outline-none focus:border-violet-400">
+              </select>
+              <input id="ttsCustomSpeakerInput" type="text" placeholder="Speaker Device ID..." 
+                class="hidden w-full px-3 py-2.5 rounded-xl bg-slate-950/90 border border-violet-500/60 text-xs sm:text-sm text-slate-100 font-mono focus:outline-none" />
+            </div>
+
+            <!-- Speech Text Input -->
+            <div class="md:col-span-6 relative">
+              <input id="ttsSpeechInput" type="text" 
+                placeholder="Type what Alexa should announce (e.g., Dinner is ready!)" 
+                onkeydown="if(event.key === 'Enter') sendTTSAnnouncement()"
+                class="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-400" />
+              <button onclick="document.getElementById('ttsSpeechInput').value=''; document.getElementById('ttsSpeechInput').focus();" 
+                title="Clear text"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1">
+                ✕
+              </button>
+            </div>
+
+            <!-- Send Announcement Button -->
+            <div class="md:col-span-2">
+              <button id="btnSendTTS" onclick="sendTTSAnnouncement()"
+                class="w-full h-full min-h-[40px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 active:scale-95 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-violet-600/25 flex items-center justify-center gap-2 transition">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                <span>Speak</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Phrase Chips -->
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar mt-2.5 pt-2 border-t border-slate-800/80">
+            <span class="text-[11px] text-slate-400 shrink-0 mr-1">Quick Phrases:</span>
+            <button onclick="fillAndSendTTS('Dinner is ready!')" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs shrink-0 transition">🍽️ Dinner is ready</button>
+            <button onclick="fillAndSendTTS('Kettle has boiled, tea is ready.')" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs shrink-0 transition">☕ Tea is ready</button>
+            <button onclick="fillAndSendTTS('Someone is at the front door.')" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs shrink-0 transition">🚪 Front door</button>
+            <button onclick="fillAndSendTTS('Heading out now, see you later!')" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs shrink-0 transition">👋 Heading out</button>
+            <button onclick="fillAndSendTTS('Please check your phone messages.')" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs shrink-0 transition">📱 Check phone</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN REMOTE CONTROL WORKSPACE -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 flex flex-col gap-4">
+    
+    <!-- EDIT MODE BANNER (Hidden unless Edit Mode is active) -->
+    <div id="editModeBanner" class="hidden p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 font-bold">✎</span>
+        <div>
+          <h2 class="text-sm font-bold text-amber-200">Layout &amp; Button Editor Active</h2>
+          <p class="text-xs text-amber-300/80">Add new routine triggers, edit webhook URLs/IDs, or reorder tiles.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="openButtonModal()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md">
+          <span>＋ Add Routine Button</span>
+        </button>
+        <button onclick="toggleEditMode()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium border border-slate-700 transition">
+          Done
+        </button>
+      </div>
+    </div>
+
+    <!-- FILTER TABS, SEARCH & QUICK ADD ROW -->
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <!-- Category Pills -->
+      <div id="categoryTabs" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 max-w-full">
+        <!-- Dynamically rendered via JS -->
+      </div>
+
+      <!-- Search Input + Quick Add Button -->
+      <div class="flex items-center gap-2 ml-auto shrink-0">
+        <div class="relative">
+          <input id="routineSearchInput" type="text" oninput="handleSearchInput(this.value)" placeholder="Filter buttons..."
+            class="w-32 sm:w-44 pl-7 pr-6 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/60" />
+          <svg class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <button id="btnClearSearch" onclick="clearSearchInput()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-white">✕</button>
+        </div>
+
+        <button onclick="openButtonModal()" title="Add New Routine Button"
+          class="shrink-0 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+          <span class="text-sm leading-none">＋</span>
+          <span class="hidden sm:inline">New Button</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- REMOTE CONTROL BUTTON GRID -->
+    <div id="remoteGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      <!-- Dynamically populated with tactile remote tiles -->
+    </div>
+
+    <!-- RECENT WEBHOOK ACTIVITY LOG & INSPECTOR -->
+    <section class="mt-auto pt-4">
+      <div class="rounded-2xl bg-slate-900/90 border border-slate-800/90 overflow-hidden shadow-lg">
+        <div class="px-4 py-2.5 bg-slate-950/60 border-b border-slate-800/80 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Live Dispatch Log &amp; Webhook Inspector</h3>
+          </div>
+          <button onclick="clearActivityLog()" class="text-[11px] text-slate-500 hover:text-slate-300 transition">
+            Clear Log
+          </button>
+        </div>
+        <div id="activityLogList" class="max-h-36 overflow-y-auto divide-y divide-slate-800/60 font-mono text-xs">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full px-4 sm:px-0 pointer-events-none"></div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: ADD / EDIT ROUTINE BUTTON                                    -->
+  <!-- ===================================================================== -->
+  <div id="buttonModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl my-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 id="buttonModalTitle" class="text-lg font-bold text-white">Configure Routine Button</h3>
+        <button onclick="closeModal('buttonModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+
+      <form id="buttonForm" onsubmit="saveButtonForm(event)" class="space-y-4 mt-4">
+        <input type="hidden" id="btnIdInput" />
+
+        <!-- Button Label & Category -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Button Label *</label>
+            <input id="btnLabelInput" type="text" required placeholder="e.g., Desk & Shack Power"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-400" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Category</label>
+            <input id="btnCategoryInput" type="text" list="categorySuggestions" placeholder="Lighting"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-400" />
+            <datalist id="categorySuggestions">
+              <option value="Lighting"></option>
+              <option value="Scenes"></option>
+              <option value="Media"></option>
+              <option value="Climate"></option>
+              <option value="System"></option>
+            </datalist>
+          </div>
+        </div>
+
+        <!-- Sub-label / Action Description & Emoji Icon -->
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Icon / Emoji</label>
+            <input id="btnIconInput" type="text" maxlength="4" placeholder="⚡"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-center text-lg focus:outline-none focus:border-cyan-400" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Sub-label (Optional)</label>
+            <input id="btnSubtitleInput" type="text" placeholder="e.g., Smart Plugs ON"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-400" />
+          </div>
+        </div>
+
+        <!-- Quick Emoji Picker Strip -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+          <span class="text-[11px] text-slate-500 mr-1 shrink-0">Pick Icon:</span>
+          <button type="button" onclick="setEmoji('⚡')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">⚡</button>
+          <button type="button" onclick="setEmoji('💡')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">💡</button>
+          <button type="button" onclick="setEmoji('🌙')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">🌙</button>
+          <button type="button" onclick="setEmoji('🎬')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">🎬</button>
+          <button type="button" onclick="setEmoji('☀️')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">☀️</button>
+          <button type="button" onclick="setEmoji('🔥')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">🔥</button>
+          <button type="button" onclick="setEmoji('📻')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">📻</button>
+          <button type="button" onclick="setEmoji('☕')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">☕</button>
+          <button type="button" onclick="setEmoji('🔒')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">🔒</button>
+          <button type="button" onclick="setEmoji('🔊')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">🔊</button>
+          <button type="button" onclick="setEmoji('🖥️')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">🖥️</button>
+          <button type="button" onclick="setEmoji('🚨')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">🚨</button>
+        </div>
+
+        <!-- Color Accent Selector -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Tile Glow Color Accent</label>
+          <div id="colorPickerRow" class="grid grid-cols-6 gap-2">
+            <button type="button" onclick="selectAccentColor('cyan')" data-color="cyan" class="accent-choice py-2 rounded-xl border border-cyan-500/50 bg-cyan-500/20 text-cyan-300 text-xs font-semibold">Cyan</button>
+            <button type="button" onclick="selectAccentColor('emerald')" data-color="emerald" class="accent-choice py-2 rounded-xl border border-emerald-500/50 bg-emerald-500/20 text-emerald-300 text-xs font-semibold">Green</button>
+            <button type="button" onclick="selectAccentColor('amber')" data-color="amber" class="accent-choice py-2 rounded-xl border border-amber-500/50 bg-amber-500/20 text-amber-300 text-xs font-semibold">Amber</button>
+            <button type="button" onclick="selectAccentColor('rose')" data-color="rose" class="accent-choice py-2 rounded-xl border border-rose-500/50 bg-rose-500/20 text-rose-300 text-xs font-semibold">Rose</button>
+            <button type="button" onclick="selectAccentColor('violet')" data-color="violet" class="accent-choice py-2 rounded-xl border border-violet-500/50 bg-violet-500/20 text-violet-300 text-xs font-semibold">Violet</button>
+            <button type="button" onclick="selectAccentColor('blue')" data-color="blue" class="accent-choice py-2 rounded-xl border border-blue-500/50 bg-blue-500/20 text-blue-300 text-xs font-semibold">Blue</button>
+          </div>
+          <input type="hidden" id="btnAccentInput" value="cyan" />
+        </div>
+
+        <!-- Trigger Provider Selection -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Webhook / Skill Provider</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" id="provTab_voicemonkey" onclick="selectProviderType('voicemonkey')"
+              class="py-2.5 px-2 rounded-xl border text-xs font-semibold transition flex flex-col items-center gap-0.5">
+              <span>🐵 Voice Monkey</span>
+              <span class="text-[10px] opacity-75">v3 Device ID</span>
+            </button>
+            <button type="button" id="provTab_urltrigger" onclick="selectProviderType('urltrigger')"
+              class="py-2.5 px-2 rounded-xl border text-xs font-semibold transition flex flex-col items-center gap-0.5">
+              <span>🔗 URL Trigger</span>
+              <span class="text-[10px] opacity-75">Full Webhook URL</span>
+            </button>
+            <button type="button" id="provTab_virtualbutton" onclick="selectProviderType('virtualbutton')"
+              class="py-2.5 px-2 rounded-xl border text-xs font-semibold transition flex flex-col items-center gap-0.5">
+              <span>🔘 Virtual Btn</span>
+              <span class="text-[10px] opacity-75">Button # (1-99)</span>
+            </button>
+          </div>
+          <input type="hidden" id="btnProviderInput" value="voicemonkey" />
+        </div>
+
+        <!-- Provider-Specific Target Input -->
+        <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <label id="targetFieldLabel" class="block text-xs font-semibold text-cyan-300">Voice Monkey Trigger Device ID *</label>
+            <button type="button" id="btnExtractUrlHelper" onclick="extractUrlFromInput()" class="hidden text-[11px] text-cyan-400 hover:underline">
+              Extract URL from pasted text
+            </button>
+          </div>
+          <input id="btnTargetInput" type="text" required placeholder="e.g., desk-power-trigger"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-cyan-400" />
+          <p id="targetFieldHelp" class="text-[11px] text-slate-400 leading-relaxed">
+            Uses your global Voice Monkey v3 API Token from Settings. Only enter the Monkey/Trigger Device ID here.
+          </p>
+        </div>
+
+        <!-- Modal Footer Actions -->
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+          <button type="button" onclick="closeModal('buttonModal')"
+            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-medium transition">
+            Cancel
+          </button>
+          <button type="submit"
+            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-cyan-500/20 transition">
+            Save Button
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: GLOBAL SETTINGS, TOKENS & JSON BACKUP                        -->
+  <!-- ===================================================================== -->
+  <div id="settingsModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div>
+          <h3 class="text-lg font-bold text-white">Remote Settings &amp; Backup</h3>
+          <p class="text-xs text-slate-400">Stored locally in your browser's localStorage</p>
+        </div>
+        <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="space-y-5 mt-4">
+        <!-- Voice Monkey API v3 Token -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold uppercase tracking-wider text-violet-300">🐵 Voice Monkey API v3 Token</label>
+            <span class="text-[11px] text-slate-400">Used for VM Triggers &amp; Live TTS</span>
+          </div>
+          <div class="flex gap-2">
+            <input id="settingsVmToken" type="password" placeholder="Paste your Voice Monkey v3 Token..."
+              class="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-violet-400" />
+            <button type="button" onclick="togglePasswordVisibility('settingsVmToken')"
+              class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700">
+              Show
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400">
+            Found in the Voice Monkey console under <strong>Settings → API v3 Token</strong>.
+          </p>
+        </div>
+
+        <!-- Saved Echo Speakers for TTS -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold uppercase tracking-wider text-cyan-300">🔊 Saved Echo Speakers (for TTS Bar)</label>
+            <span class="text-[11px] text-slate-400">Voice Monkey Speaker Device IDs</span>
+          </div>
+
+          <div id="savedSpeakersList" class="space-y-1.5 max-h-36 overflow-y-auto">
+            <!-- Dynamically rendered list of speakers -->
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-800/80">
+            <input id="newSpeakerName" type="text" placeholder="Label (e.g. Office Echo)"
+              class="sm:col-span-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-400" />
+            <input id="newSpeakerId" type="text" placeholder="Device ID (e.g. echo-dot-office)"
+              class="sm:col-span-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-cyan-400" />
+            <button type="button" onclick="addSavedSpeaker()"
+              class="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 text-xs font-semibold">
+              + Add
+            </button>
+          </div>
+        </div>
+
+        <!-- Optional Virtual Buttons Access Code -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold uppercase tracking-wider text-emerald-300">🔘 Virtual Buttons Access Code (Optional)</label>
+            <span class="text-[11px] text-slate-400">Thomptronics Skill</span>
+          </div>
+          <input id="settingsVbAccessCode" type="password" placeholder="Optional: Paste VirtualButtons accessCode..."
+            class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-emerald-400" />
+        </div>
+
+        <!-- Export / Import Configuration Backup -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold uppercase tracking-wider text-amber-300">📦 Backup &amp; Sync Remote Layout (JSON)</label>
+            <button type="button" onclick="resetToDefaultsConfirm()" class="text-[11px] text-rose-400 hover:underline">
+              Reset to Demo Defaults
+            </button>
+          </div>
+          <p class="text-xs text-slate-400">
+            Export your buttons, speakers, and tokens to a JSON file or copy them to transfer between your desktop and phone.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="exportConfigFile()"
+              class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5">
+              ⬇️ Download JSON File
+            </button>
+            <button type="button" onclick="copyConfigToClipboard()"
+              class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5">
+              📋 Copy JSON to Clipboard
+            </button>
+            <label class="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold cursor-pointer flex items-center gap-1.5">
+              ⬆️ Import JSON File
+              <input type="file" accept=".json,application/json" onchange="importConfigFile(event)" class="hidden" />
+            </label>
+          </div>
+          <div id="resetConfirmBox" class="hidden p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 flex items-center justify-between">
+            <span class="text-xs text-rose-200">Restore original 6 example buttons?</span>
+            <div class="flex gap-2">
+              <button type="button" onclick="confirmResetDefaults()" class="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-bold">Yes, Reset</button>
+              <button type="button" onclick="document.getElementById('resetConfirmBox').classList.add('hidden')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Save Settings Footer -->
+        <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('settingsModal')"
+            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-medium">
+            Close
+          </button>
+          <button type="button" onclick="saveGlobalSettings()"
+            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs sm:text-sm shadow-lg">
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: QUICK SETUP GUIDE                                            -->
+  <!-- ===================================================================== -->
+  <div id="guideModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <span class="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 font-bold">?</span>
+          <div>
+            <h3 class="text-lg font-bold text-white">Quick Setup Guide</h3>
+            <p class="text-xs text-slate-400">Connecting your Alexa Routines to this standalone remote</p>
+          </div>
+        </div>
+        <button onclick="closeModal('guideModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="space-y-4 mt-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
+        <!-- Option A: URL Routine Trigger -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+          <h4 class="font-bold text-cyan-300 flex items-center gap-2">
+            <span>🔗 Option 1: URL Routine Trigger (Virtual Smart Home)</span>
+            <span class="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 text-[10px]">Simplest for Routines</span>
+          </h4>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-300 text-xs">
+            <li>Enable the free <strong>"URL Routine Trigger"</strong> skill in your Alexa App and link your Amazon account.</li>
+            <li>Visit <code class="text-cyan-300 bg-slate-900 px-1.5 py-0.5 rounded">virtualsmarthome.xyz/url_routine_trigger/</code> to create a named trigger (it appears in Alexa as a Virtual Doorbell).</li>
+            <li>In the Alexa App, create a Routine with <strong>When this happens → Smart Home → [Your Trigger Name]</strong>.</li>
+            <li>Copy the <strong>Activate URL</strong> (`https://www.virtualsmarthome.xyz/url_routine_trigger/activate.php?trigger=...`), click <strong>＋ New Button</strong> here, select <strong>URL Trigger</strong>, and paste it in!</li>
+          </ol>
+        </div>
+
+        <!-- Option B: Voice Monkey v3 -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+          <h4 class="font-bold text-violet-300 flex items-center gap-2">
+            <span>🐵 Option 2: Voice Monkey (API v3)</span>
+            <span class="px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 text-[10px]">Routines + Live TTS Speech</span>
+          </h4>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-300 text-xs">
+            <li>Enable the <strong>Voice Monkey</strong> skill in Alexa and log into the Voice Monkey Console.</li>
+            <li>Copy your <strong>API v3 Token</strong> and save it once in this app's <strong>Settings (⚙️)</strong> modal.</li>
+            <li>Create a Routine Trigger device in Voice Monkey (e.g., <code class="text-violet-300 bg-slate-900 px-1.5 py-0.5 rounded">study-lights</code>) and paste only that Device ID into any button on this remote.</li>
+            <li>For live Text-to-Speech announcements, add an Echo Speaker device in Voice Monkey and use the <strong>Announce (TTS)</strong> bar at the top of this remote!</li>
+          </ol>
+        </div>
+
+        <!-- Pro Tip on Doorbell Announcements & CORS -->
+        <div class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-200 space-y-1">
+          <div class="font-bold text-emerald-300">💡 Built-in Local HTML &amp; CORS Protection</div>
+          <p class="text-emerald-200/80">
+            This remote automatically dispatches webhooks with <code class="font-mono">mode: 'no-cors'</code> and cache-busting timestamps, so you can save this single <code class="font-mono">.html</code> file directly to your phone's home screen or desktop and trigger routines with zero browser CORS blocks.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-5 pt-3 border-t border-slate-800">
+        <button onclick="closeModal('guideModal')" class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs sm:text-sm">
+          Got It
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 4: GITHUB PAGES & INSTALLABLE PWA EXPORT KIT                    -->
+  <!-- ===================================================================== -->
+  <div id="githubModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-lg">📦</span>
+          <div>
+            <h3 class="text-lg font-bold text-white">GitHub Pages &amp; PWA Export Kit</h3>
+            <p class="text-xs text-slate-400">Host on GitHub Pages &amp; install on Android/iOS as a full-screen standalone app</p>
+          </div>
+        </div>
+        <button onclick="closeModal('githubModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+      </div>
+
+      <div class="space-y-4 mt-4 text-xs sm:text-sm">
+        <!-- Step 1: Security Mode Selection for Baking Layout into index.html -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">1. Choose Security Mode for Exported <code class="font-mono">index.html</code></span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold">Bakes Current Buttons</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <label id="exportModePublicCard" onclick="setExportSecurityMode('public')"
+              class="cursor-pointer p-3 rounded-xl border border-cyan-400 bg-cyan-500/10 flex flex-col justify-between gap-1.5 transition">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-white text-xs sm:text-sm">🛡️ Public Repo Safe (Recommended)</span>
+                <input type="radio" name="exportSecMode" value="public" checked class="accent-cyan-400" />
+              </div>
+              <p class="text-[11px] text-slate-300 leading-relaxed">
+                Bakes your current buttons, icons, colors, and speaker IDs into <code class="font-mono">index.html</code>, but <strong>strips secret API tokens</strong> so your public GitHub repo stays 100% safe.
+              </p>
+            </label>
+
+            <label id="exportModePrivateCard" onclick="setExportSecurityMode('private')"
+              class="cursor-pointer p-3 rounded-xl border border-slate-800 bg-slate-900/70 flex flex-col justify-between gap-1.5 transition">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-white text-xs sm:text-sm">🔑 Full Clone (Private Repo Only)</span>
+                <input type="radio" name="exportSecMode" value="private" class="accent-amber-400" />
+              </div>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                Bakes your buttons <strong>and</strong> your live Voice Monkey / Virtual Buttons tokens &amp; full webhook URLs directly into <code class="font-mono">index.html</code>.
+              </p>
+            </label>
+          </div>
+          <input type="hidden" id="selectedExportMode" value="public" />
+        </div>
+
+        <!-- Step 2: Download the 3 PWA Files -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-violet-300">2. Download Repository Files</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">All paths use <code class="font-mono text-slate-300">./</code> so they work in any <code class="font-mono text-slate-300">username.github.io/repo-name/</code> folder.</p>
+            </div>
+            <button type="button" onclick="downloadAllGithubFiles()"
+              class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-1.5 transition">
+              <span>⬇️ Download All 3 Files</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+            <!-- File 1: index.html -->
+            <button type="button" onclick="downloadBakedIndexHtml()"
+              class="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-left flex flex-col justify-between gap-2 transition group">
+              <div class="flex items-center justify-between">
+                <span class="font-mono font-bold text-cyan-300 text-xs group-hover:underline">index.html</span>
+                <span class="text-xs text-slate-400">⬇️</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Complete app + your custom button deck baked in as default.</p>
+            </button>
+
+            <!-- File 2: manifest.json -->
+            <button type="button" onclick="downloadManifestJson()"
+              class="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-left flex flex-col justify-between gap-2 transition group">
+              <div class="flex items-center justify-between">
+                <span class="font-mono font-bold text-emerald-300 text-xs group-hover:underline">manifest.json</span>
+                <span class="text-xs text-slate-400">⬇️</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Standalone display profile, dark theme &amp; embedded vector icons.</p>
+            </button>
+
+            <!-- File 3: sw.js -->
+            <button type="button" onclick="downloadServiceWorkerJs()"
+              class="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-left flex flex-col justify-between gap-2 transition group">
+              <div class="flex items-center justify-between">
+                <span class="font-mono font-bold text-amber-300 text-xs group-hover:underline">sw.js</span>
+                <span class="text-xs text-slate-400">⬇️</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Offline Service Worker for instant mobile startup &amp; WebAPK install.</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3: Quick Instructions for GitHub Pages & Mobile Install -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-300">3. Deploy to GitHub Pages in 60 Seconds</h4>
+          <ol class="list-decimal list-inside space-y-1.5 text-xs text-slate-300 leading-relaxed">
+            <li>Create a new repository on GitHub (e.g., <code class="font-mono text-cyan-300 bg-slate-900 px-1.5 py-0.5 rounded">alexa-remote</code>) and upload <code class="font-mono text-slate-200">index.html</code>, <code class="font-mono text-slate-200">manifest.json</code>, and <code class="font-mono text-slate-200">sw.js</code> to the root folder.</li>
+            <li>Go to your repo's <strong>Settings → Pages</strong>, set <strong>Branch</strong> to <code class="font-mono text-slate-200">main</code> (folder <code class="font-mono text-slate-200">/root</code>), and click <strong>Save</strong>.</li>
+            <li>Open your live URL (<code class="font-mono text-cyan-300">https://&lt;username&gt;.github.io/alexa-remote/</code>) in <strong>Chrome on Android</strong> (or Safari on iOS).</li>
+            <li>Tap the <strong>"Install App"</strong> button in the top bar (or browser menu → <strong>Add to Home screen / Install app</strong>) to launch it full-screen like a native remote!</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-5 pt-3 border-t border-slate-800">
+        <button onclick="closeModal('githubModal')" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 5: BUILD ANDROID APK STUDIO (GITHUB ACTIONS & PWABUILDER)       -->
+  <!-- ===================================================================== -->
+  <div id="apkModal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-3xl w-full p-5 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3.5 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <span class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xl shadow-inner">📱</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-bold text-white">Android APK Builder Studio</h3>
+              <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold uppercase tracking-wider">No Android Studio Required</span>
+            </div>
+            <p class="text-xs text-slate-400">Compile a real installable <code class="font-mono text-emerald-300">.apk</code> in the cloud using GitHub Actions or PWABuilder</p>
+          </div>
+        </div>
+        <button onclick="closeModal('apkModal')" class="text-slate-400 hover:text-white p-1.5 rounded-lg">✕</button>
+      </div>
+
+      <!-- Method Selector Tabs -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 bg-slate-950/90 p-1.5 rounded-2xl border border-slate-800">
+        <button type="button" id="apkTabBtn_actions" onclick="switchApkTab('actions')"
+          class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 bg-emerald-500 text-slate-950 shadow-md">
+          <span>⚡ Method A: GitHub Actions Auto-APK</span>
+          <span class="px-1.5 py-0.5 rounded bg-slate-950/20 text-[10px]">Recommended</span>
+        </button>
+        <button type="button" id="apkTabBtn_pwabuilder" onclick="switchApkTab('pwabuilder')"
+          class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 text-slate-300 hover:text-white">
+          <span>🌐 Method B: PWABuilder + AssetLinks</span>
+          <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">60s Cloud</span>
+        </button>
+      </div>
+
+      <!-- =============================================================== -->
+      <!-- TAB 1: GITHUB ACTIONS AUTO-APK COMPILER                         -->
+      <!-- =============================================================== -->
+      <div id="apkTabPanel_actions" class="space-y-4 mt-4 text-xs sm:text-sm">
+        <div class="p-3.5 rounded-xl bg-emerald-950/25 border border-emerald-500/30 text-emerald-200 text-xs leading-relaxed">
+          <strong>How it works:</strong> Drop your configured <code class="font-mono text-white">index.html</code> and <code class="font-mono text-white">.github/workflows/build-apk.yml</code> into your GitHub repository. Every time you push or click <em>Run workflow</em>, GitHub's cloud Ubuntu servers automatically wrap your remote inside a native Android WebView app (with <code class="font-mono">domStorageEnabled = true</code> for <code class="font-mono">localStorage</code>, haptic vibration, and offline assets) and hand you a ready-to-install <strong><code class="font-mono">Alexa-Remote-debug.apk</code></strong>!
+        </div>
+
+        <!-- Step 1: APK Metadata & Security Configuration -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-300">1. Customize Your Native Android APK</span>
+            <span class="text-[11px] text-slate-400 font-mono">Target SDK 34 • Min SDK 24</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">App Display Name</label>
+              <input id="apkAppNameInput" type="text" value="Alexa Remote" oninput="updateApkYamlPreview()"
+                placeholder="Alexa Remote"
+                class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-400" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Android Package ID</label>
+              <input id="apkPackageIdInput" type="text" value="com.custom.alexaremote" oninput="updateApkYamlPreview()"
+                placeholder="com.custom.alexaremote"
+                class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-emerald-400" />
+            </div>
+          </div>
+
+          <!-- Embed Current Buttons & Security Mode -->
+          <div class="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div>
+              <span class="text-xs font-semibold text-slate-200 block">Embed Current Buttons &amp; Settings into <code class="font-mono text-cyan-300">index.html</code></span>
+              <span class="text-[11px] text-slate-400">Choose whether to strip or include live API keys in the exported HTML file:</span>
+            </div>
+            <select id="apkHtmlSecuritySelect"
+              class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 font-medium focus:outline-none focus:border-emerald-400">
+              <option value="public">🛡️ Public Repo Safe (Buttons + Speakers, Strip Tokens)</option>
+              <option value="private">🔑 Private Repo Clone (Include Live Tokens &amp; URLs)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Step 2: One-Click Downloads & Live YAML Preview -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">2. Download Your 2 Auto-Build Files</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">Generates the complete Gradle + Android SDK cloud compiler workflow.</p>
+            </div>
+            <button type="button" onclick="toggleYamlPreviewBox()" class="text-xs text-cyan-400 hover:underline font-mono">
+              <span id="yamlPreviewToggleText">👁️ View build-apk.yml Code</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <!-- Button 1: Download build-apk.yml -->
+            <button type="button" onclick="downloadGithubActionYaml()"
+              class="p-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-between transition">
+              <div class="text-left">
+                <div class="font-mono text-xs font-extrabold">⬇️ build-apk.yml</div>
+                <div class="text-[10px] opacity-80 font-medium">Put in .github/workflows/</div>
+              </div>
+              <span class="text-base">⚡</span>
+            </button>
+
+            <!-- Button 2: Copy YAML to Clipboard -->
+            <button type="button" onclick="copyGithubActionYaml()"
+              class="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-between transition">
+              <div class="text-left">
+                <div class="text-xs font-bold text-white">📋 Copy Workflow YAML</div>
+                <div class="text-[10px] text-slate-400">Paste directly on GitHub</div>
+              </div>
+              <span>📋</span>
+            </button>
+
+            <!-- Button 3: Download Configured index.html -->
+            <button type="button" onclick="downloadApkConfiguredIndexHtml()"
+              class="p-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 font-semibold text-xs flex items-center justify-between transition">
+              <div class="text-left">
+                <div class="font-mono text-xs font-bold text-cyan-300">⬇️ index.html</div>
+                <div class="text-[10px] text-cyan-200/80">Pre-loaded with your deck</div>
+              </div>
+              <span>📄</span>
+            </button>
+          </div>
+
+          <!-- Collapsible YAML Code Preview -->
+          <div id="apkYamlPreviewContainer" class="hidden pt-2">
+            <pre id="apkYamlPreviewCode" class="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-56 select-all"></pre>
+          </div>
+        </div>
+
+        <!-- Step 3: 3-Bullet Visual Checklist -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2.5">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-amber-300">3. Three-Step GitHub APK Checklist</h4>
+          <div class="space-y-2 text-xs text-slate-300">
+            <div class="flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[11px]">1</span>
+              <p>Upload <code class="font-mono text-cyan-300 bg-slate-900 px-1.5 py-0.5 rounded">index.html</code> to the root of your GitHub repository.</p>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
+              <p>In your repo, click <strong>Add file → Create new file</strong>, name it <code class="font-mono text-emerald-300 bg-slate-900 px-1.5 py-0.5 rounded">.github/workflows/build-apk.yml</code>, and paste or upload the workflow file above.</p>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[11px]">3</span>
+              <p>Click the <strong>Actions</strong> tab in your GitHub repository → select the completed <strong>Build Standalone Android APK</strong> run → scroll down to <strong>Artifacts</strong> and download <strong><code class="font-mono text-amber-300">Alexa-Remote-APK</code></strong> (and optional GitHub Release APK) to install on your phone!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =============================================================== -->
+      <!-- TAB 2: PWABUILDER + DIGITAL ASSET LINKS GENERATOR               -->
+      <!-- =============================================================== -->
+      <div id="apkTabPanel_pwabuilder" class="hidden space-y-4 mt-4 text-xs sm:text-sm">
+        <div class="p-3.5 rounded-xl bg-cyan-950/25 border border-cyan-500/30 text-cyan-200 text-xs leading-relaxed">
+          <strong>60-Second Cloud APK via PWABuilder:</strong> If your remote is already hosted on GitHub Pages (<code class="font-mono text-white">https://&lt;username&gt;.github.io/&lt;repo&gt;/</code>), paste that URL into Microsoft's free <strong>pwabuilder.com</strong> tool and click <strong>Package for stores → Android → Download Package</strong>.
+        </div>
+
+        <!-- Step 1: PWABuilder Manifest & Requirements -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-cyan-300 block">1. PWABuilder-Compliant <code class="font-mono">manifest.json</code></span>
+            <p class="text-[11px] text-slate-400 mt-0.5">Includes explicit <code class="font-mono text-slate-300">192x192</code> and <code class="font-mono text-slate-300">512x512</code> icon entries required by PWABuilder's TWA packager.</p>
+          </div>
+          <button type="button" onclick="downloadManifestJson()"
+            class="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition">
+            ⬇️ Download manifest.json
+          </button>
+        </div>
+
+        <!-- Step 2: Built-in Digital Asset Links (.well-known/assetlinks.json) Generator -->
+        <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-violet-300">2. Fullscreen TWA <code class="font-mono">assetlinks.json</code> Generator</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">
+                Removes the Chrome URL address bar at the top of your PWABuilder APK by verifying domain ownership at <code class="font-mono text-slate-200">.well-known/assetlinks.json</code>.
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">PWABuilder Package Name</label>
+              <input id="twaPackageInput" type="text" value="io.github.username.twa" oninput="updateAssetLinksPreview()"
+                placeholder="io.github.username.twa"
+                class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-violet-400" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">SHA-256 Certificate Fingerprint</label>
+              <input id="twaSha256Input" type="text" value="14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5" oninput="updateAssetLinksPreview()"
+                placeholder="AA:BB:CC:DD:..."
+                class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-violet-400" />
+            </div>
+          </div>
+
+          <pre id="assetLinksPreviewCode" class="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-violet-300 overflow-x-auto select-all"></pre>
+
+          <div class="flex flex-wrap gap-2.5">
+            <button type="button" onclick="downloadAssetLinksJson()"
+              class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-violet-600/20 flex items-center gap-1.5 transition">
+              <span>⬇️ Download assetlinks.json</span>
+            </button>
+            <button type="button" onclick="copyAssetLinksJson()"
+              class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs flex items-center gap-1.5 transition">
+              <span>📋 Copy JSON</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400">
+            📁 Place this file at <code class="font-mono text-violet-300 bg-slate-900 px-1.5 py-0.5 rounded">.well-known/assetlinks.json</code> in your GitHub Pages repository so Android launches your APK in 100% fullscreen native mode.
+          </p>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between mt-5 pt-3 border-t border-slate-800">
+        <span class="text-[11px] text-slate-500">Tip: Method A works offline &amp; doesn't even require GitHub Pages to be enabled!</span>
+        <button onclick="closeModal('apkModal')" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION JAVASCRIPT                                                -->
+  <!-- ===================================================================== -->
+  <script>
+    /*************************************************************************
+     * 1. STATE & DEFAULT CONFIGURATION
+     *************************************************************************/
+    const STORAGE_KEY = 'alexa_routine_remote_v1';
+    let deferredInstallPrompt = null;
+
+    const DEFAULT_BUTTONS = [
+      {
+        id: 'btn-desk-power',
+        label: 'Desk & Shack Power',
+        subtitle: 'Smart Plugs • ON',
+        category: 'System',
+        icon: '⚡',
+        accent: 'cyan',
+        provider: 'voicemonkey',
+        target: 'demo-desk-shack-power',
+        lastTriggered: null
+      },
+      {
+        id: 'btn-all-lights-off',
+        label: 'All Lights Off',
+        subtitle: 'Whole Home • OFF',
+        category: 'Lighting',
+        icon: '🌙',
+        accent: 'rose',
+        provider: 'urltrigger',
+        target: 'https://www.virtualsmarthome.xyz/url_routine_trigger/activate.php?trigger=DEMO_LIGHTS_OFF&token=DEMO_TOKEN&response=html',
+        lastTriggered: null
+      },
+      {
+        id: 'btn-movie-mode',
+        label: 'Movie Mode',
+        subtitle: 'Dim Bias + TV Scene',
+        category: 'Scenes',
+        icon: '🎬',
+        accent: 'violet',
+        provider: 'voicemonkey',
+        target: 'demo-movie-scene',
+        lastTriggered: null
+      },
+      {
+        id: 'btn-morning-briefing',
+        label: 'Morning Briefing',
+        subtitle: 'Weather, News & Kettle',
+        category: 'Scenes',
+        icon: '☀️',
+        accent: 'amber',
+        provider: 'urltrigger',
+        target: 'https://www.virtualsmarthome.xyz/url_routine_trigger/activate.php?trigger=DEMO_MORNING&token=DEMO_TOKEN&response=html',
+        lastTriggered: null
+      },
+      {
+        id: 'btn-heating-boost',
+        label: 'Heating Boost +1hr',
+        subtitle: 'Thermostat • 21°C',
+        category: 'Climate',
+        icon: '🔥',
+        accent: 'emerald',
+        provider: 'voicemonkey',
+        target: 'demo-heating-boost',
+        lastTriggered: null
+      },
+      {
+        id: 'btn-quiet-night',
+        label: 'Quiet Night Mode',
+        subtitle: 'Echo Volume 2 + Lock Check',
+        category: 'Media',
+        icon: '🔉',
+        accent: 'blue',
+        provider: 'virtualbutton',
+        target: '1',
+        lastTriggered: null
+      }
+    ];
+
+    const DEFAULT_SPEAKERS = [
+      { name: 'Office Echo Dot', id: 'office-echo-dot' },
+      { name: 'Kitchen Echo Show', id: 'kitchen-echo' },
+      { name: 'Living Room Echo', id: 'living-room-echo' }
+    ];
+
+    let appState = {
+      vmToken: '',
+      vbAccessCode: '',
+      soundEnabled: true,
+      activeCategory: 'All',
+      searchQuery: '',
+      editMode: false,
+      ttsOpen: false,
+      speakers: [...DEFAULT_SPEAKERS],
+      selectedSpeakerId: 'office-echo-dot',
+      buttons: [...DEFAULT_BUTTONS],
+      activityLog: []
+    };
+
+    // Pending delete confirmation state inside Edit Mode (avoids native confirm())
+    let pendingDeleteId = null;
+
+    // Color accent styling map for tactile cards
+    const ACCENT_STYLES = {
+      cyan: {
+        border: 'border-cyan-500/35 hover:border-cyan-400/70',
+        iconBg: 'bg-cyan-500/15 border-cyan-500/35 text-cyan-300',
+        badge: 'text-cyan-300 bg-cyan-950/80 border-cyan-500/30',
+        dot: 'bg-cyan-400',
+        bar: 'from-cyan-500 to-blue-500',
+        glow: 'rgba(34, 211, 238, 0.55)'
+      },
+      emerald: {
+        border: 'border-emerald-500/35 hover:border-emerald-400/70',
+        iconBg: 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300',
+        badge: 'text-emerald-300 bg-emerald-950/80 border-emerald-500/30',
+        dot: 'bg-emerald-400',
+        bar: 'from-emerald-500 to-teal-500',
+        glow: 'rgba(16, 185, 129, 0.55)'
+      },
+      amber: {
+        border: 'border-amber-500/35 hover:border-amber-400/70',
+        iconBg: 'bg-amber-500/15 border-amber-500/35 text-amber-300',
+        badge: 'text-amber-300 bg-amber-950/80 border-amber-500/30',
+        dot: 'bg-amber-400',
+        bar: 'from-amber-500 to-orange-500',
+        glow: 'rgba(245, 158, 11, 0.55)'
+      },
+      rose: {
+        border: 'border-rose-500/35 hover:border-rose-400/70',
+        iconBg: 'bg-rose-500/15 border-rose-500/35 text-rose-300',
+        badge: 'text-rose-300 bg-rose-950/80 border-rose-500/30',
+        dot: 'bg-rose-400',
+        bar: 'from-rose-500 to-pink-500',
+        glow: 'rgba(244, 63, 94, 0.55)'
+      },
+      violet: {
+        border: 'border-violet-500/35 hover:border-violet-400/70',
+        iconBg: 'bg-violet-500/15 border-violet-500/35 text-violet-300',
+        badge: 'text-violet-300 bg-violet-950/80 border-violet-500/30',
+        dot: 'bg-violet-400',
+        bar: 'from-violet-500 to-purple-500',
+        glow: 'rgba(139, 92, 246, 0.55)'
+      },
+      blue: {
+        border: 'border-blue-500/35 hover:border-blue-400/70',
+        iconBg: 'bg-blue-500/15 border-blue-500/35 text-blue-300',
+        badge: 'text-blue-300 bg-blue-950/80 border-blue-500/30',
+        dot: 'bg-blue-400',
+        bar: 'from-blue-500 to-indigo-500',
+        glow: 'rgba(59, 130, 246, 0.55)'
+      }
+    };
+
+    /*************************************************************************
+     * 2. WEB AUDIO SYNTHESIZER FOR TACTILE HARDWARE CLICK
+     *************************************************************************/
+    let audioCtx = null;
+    function playTactileClick(type = 'press') {
+      // Trigger Android hardware vibration (35ms tactile pulse) when supported
+      try {
+        if (navigator.vibrate) {
+          navigator.vibrate(type === 'press' ? 35 : 45);
+        }
+      } catch (e) {}
+
+      if (!appState.soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        if (type === 'press') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.055);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+          osc.start(now);
+          osc.stop(now + 0.07);
+        } else if (type === 'tts') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(660, now + 0.12);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+          osc.start(now);
+          osc.stop(now + 0.14);
+        }
+      } catch (e) {
+        // Ignore audio context restrictions if any
+      }
+    }
+
+    function toggleSoundEffects() {
+      appState.soundEnabled = !appState.soundEnabled;
+      saveState();
+      updateSoundToggleUI();
+      if (appState.soundEnabled) playTactileClick('press');
+      showToast(appState.soundEnabled ? 'Tactile click sounds enabled' : 'Tactile click sounds muted', 'info');
+    }
+
+    function updateSoundToggleUI() {
+      const onIcon = document.getElementById('iconSoundOn');
+      const offIcon = document.getElementById('iconSoundOff');
+      if (appState.soundEnabled) {
+        onIcon.classList.remove('hidden');
+        offIcon.classList.add('hidden');
+      } else {
+        onIcon.classList.add('hidden');
+        offIcon.classList.remove('hidden');
+      }
+    }
+
+    /*************************************************************************
+     * 3. PERSISTENCE (localStorage) & BAKED GITHUB CONFIG LOADER
+     *************************************************************************/
+    function getBakedConfig() {
+      try {
+        const el = document.getElementById('bakedConfigData');
+        if (!el || !el.textContent) return null;
+        const parsed = JSON.parse(el.textContent);
+        if (parsed && (Array.isArray(parsed.buttons) || Array.isArray(parsed.speakers))) {
+          return parsed;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function loadState() {
+      const baked = getBakedConfig();
+      if (baked) {
+        if (Array.isArray(baked.buttons) && baked.buttons.length > 0) {
+          appState.buttons = JSON.parse(JSON.stringify(baked.buttons));
+        }
+        if (Array.isArray(baked.speakers) && baked.speakers.length > 0) {
+          appState.speakers = JSON.parse(JSON.stringify(baked.speakers));
+          appState.selectedSpeakerId = appState.speakers[0].id;
+        }
+        if (typeof baked.vmToken === 'string' && baked.vmToken) {
+          appState.vmToken = baked.vmToken;
+        }
+        if (typeof baked.vbAccessCode === 'string' && baked.vbAccessCode) {
+          appState.vbAccessCode = baked.vbAccessCode;
+        }
+      }
+
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          appState = {
+            ...appState,
+            ...parsed,
+            editMode: false // Always start in clean remote control mode
+          };
+        }
+      } catch (err) {
+        console.error('Failed to read localStorage:', err);
+      }
+
+      if (!appState.activityLog || appState.activityLog.length === 0) {
+        addLogEntry('SYS', 'Remote Deck initialized. Click any button to trigger or click Edit to customize.', 'READY');
+      }
+    }
+
+    function saveState() {
+      try {
+        const toSave = {
+          vmToken: appState.vmToken,
+          vbAccessCode: appState.vbAccessCode,
+          soundEnabled: appState.soundEnabled,
+          activeCategory: appState.activeCategory,
+          ttsOpen: appState.ttsOpen,
+          speakers: appState.speakers,
+          selectedSpeakerId: appState.selectedSpeakerId,
+          buttons: appState.buttons,
+          activityLog: appState.activityLog.slice(0, 25)
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      } catch (err) {
+        console.error('Failed to save state:', err);
+      }
+    }
+
+    /*************************************************************************
+     * 4. RENDERING THE UI
+     *************************************************************************/
+    function renderAll() {
+      updateHeaderStatus();
+      updateSoundToggleUI();
+      renderTTSBar();
+      renderCategoryTabs();
+      renderRemoteGrid();
+      renderActivityLog();
+    }
+
+    function updateHeaderStatus() {
+      const badgeText = document.getElementById('connectionBadgeText');
+      const subStatus = document.getElementById('headerSubStatus');
+
+      const hasVmToken = Boolean(appState.vmToken && appState.vmToken.trim().length > 3);
+      const customUrlCount = appState.buttons.filter(
+        b => b.provider === 'urltrigger' && !b.target.includes('DEMO_')
+      ).length;
+
+      if (hasVmToken && customUrlCount > 0) {
+        badgeText.textContent = 'VM v3 + URL Live';
+        subStatus.textContent = `${appState.buttons.length} Routines Configured • Dual Provider Active`;
+      } else if (hasVmToken) {
+        badgeText.textContent = 'VM v3 Connected';
+        subStatus.textContent = `Voice Monkey API v3 Token Saved • ${appState.buttons.length} Buttons`;
+      } else if (customUrlCount > 0) {
+        badgeText.textContent = 'URL Triggers Live';
+        subStatus.textContent = `${customUrlCount} Live URL Webhook(s) • ${appState.buttons.length} Total Buttons`;
+      } else {
+        badgeText.textContent = 'Interactive Ready';
+        subStatus.textContent = 'Preloaded with 6 Demo Routines — Click Edit or ⚙️ to add your IDs';
+      }
+    }
+
+    function renderCategoryTabs() {
+      const container = document.getElementById('categoryTabs');
+      const categories = ['All'];
+      const counts = { All: appState.buttons.length };
+
+      appState.buttons.forEach(btn => {
+        const cat = (btn.category || 'General').trim();
+        if (!categories.includes(cat)) categories.push(cat);
+        counts[cat] = (counts[cat] || 0) + 1;
+      });
+
+      if (!categories.includes(appState.activeCategory)) {
+        appState.activeCategory = 'All';
+      }
+
+      container.innerHTML = categories.map(cat => {
+        const isActive = cat === appState.activeCategory;
+        const activeClasses = isActive
+          ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20 border-cyan-400'
+          : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-800 font-medium';
+        return `
+          <button onclick="setCategoryFilter('${escapeHtml(cat)}')"
+            class="px-3 py-1.5 rounded-xl border text-xs transition shrink-0 flex items-center gap-1.5 ${activeClasses}">
+            <span>${escapeHtml(cat)}</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-slate-950/25 text-slate-950' : 'bg-slate-800 text-slate-400'}">
+              ${counts[cat] || 0}
+            </span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function setCategoryFilter(category) {
+      appState.activeCategory = category;
+      saveState();
+      renderCategoryTabs();
+      renderRemoteGrid();
+    }
+
+    function handleSearchInput(val) {
+      appState.searchQuery = (val || '').trim();
+      const clearBtn = document.getElementById('btnClearSearch');
+      if (clearBtn) {
+        if (appState.searchQuery.length > 0) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+      }
+      renderRemoteGrid();
+    }
+
+    function clearSearchInput() {
+      const input = document.getElementById('routineSearchInput');
+      if (input) input.value = '';
+      handleSearchInput('');
+    }
+
+    function getProviderMeta(provider, target) {
+      const isDemo =
+        !target ||
+        target.startsWith('demo-') ||
+        target.includes('DEMO_');
+
+      if (provider === 'voicemonkey') {
+        return {
+          label: isDemo ? 'VM v3 (Demo)' : 'VM v3',
+          shortIcon: '🐵'
+        };
+      }
+      if (provider === 'virtualbutton') {
+        return {
+          label: `VirtualBtn #${target || '1'}`,
+          shortIcon: '🔘'
+        };
+      }
+      return {
+        label: isDemo ? 'URL Trigger (Demo)' : 'URL Trigger',
+        shortIcon: '🔗'
+      };
+    }
+
+    function renderRemoteGrid() {
+      const grid = document.getElementById('remoteGrid');
+      const query = (appState.searchQuery || '').toLowerCase();
+      const filtered = appState.buttons.filter(b => {
+        const catMatch = appState.activeCategory === 'All' || (b.category || 'General').trim() === appState.activeCategory;
+        if (!catMatch) return false;
+        if (!query) return true;
+        return (
+          (b.label || '').toLowerCase().includes(query) ||
+          (b.subtitle || '').toLowerCase().includes(query) ||
+          (b.category || '').toLowerCase().includes(query)
+        );
+      });
+
+      const cardsHtml = filtered.map((btn) => {
+        const realIndex = appState.buttons.findIndex(b => b.id === btn.id);
+        const accent = ACCENT_STYLES[btn.accent] || ACCENT_STYLES.cyan;
+        const provMeta = getProviderMeta(btn.provider, btn.target);
+        const isConfirmingDelete = pendingDeleteId === btn.id;
+
+        return `
+          <div id="tile-${btn.id}" 
+            style="--glow-color: ${accent.glow}"
+            onclick="${appState.editMode ? '' : `triggerRoutineButton('${btn.id}')`}"
+            class="remote-tile ${appState.editMode ? 'edit-mode-active' : 'cursor-pointer'} rounded-2xl bg-slate-900/95 border ${accent.border} p-4 flex flex-col justify-between min-h-[148px] sm:min-h-[162px] select-none">
+            
+            <!-- Top Row: Icon + Provider Badge -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="w-11 h-11 rounded-xl border ${accent.iconBg} flex items-center justify-center text-xl shadow-inner shrink-0">
+                ${escapeHtml(btn.icon || '⚡')}
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono border ${accent.badge}">
+                  <span>${provMeta.shortIcon}</span>
+                  <span>${escapeHtml(provMeta.label)}</span>
+                </span>
+                <span class="text-[10px] text-slate-400 font-medium">${escapeHtml(btn.category || 'General')}</span>
+              </div>
+            </div>
+
+            <!-- Middle: Button Title & Subtitle -->
+            <div class="my-2.5">
+              <h3 class="text-sm sm:text-base font-bold text-white leading-snug line-clamp-1">${escapeHtml(btn.label)}</h3>
+              <p class="text-xs text-slate-400 line-clamp-1 mt-0.5">${escapeHtml(btn.subtitle || btn.target)}</p>
+            </div>
+
+            <!-- Bottom Status or Edit Toolbar -->
+            ${appState.editMode ? `
+              <div class="pt-2.5 border-t border-slate-800/90 flex items-center justify-between gap-1">
+                ${isConfirmingDelete ? `
+                  <div class="flex items-center justify-between w-full gap-1">
+                    <span class="text-[11px] text-rose-300 font-semibold">Delete?</span>
+                    <div class="flex gap-1">
+                      <button onclick="confirmDeleteButton('${btn.id}', event)" class="px-2 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-bold">Yes</button>
+                      <button onclick="cancelDeleteButton(event)" class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 text-[11px]">No</button>
+                    </div>
+                  </div>
+                ` : `
+                  <div class="flex items-center gap-1">
+                    <button onclick="moveButton(${realIndex}, -1, event)" title="Move Left / Up"
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs disabled:opacity-30" ${realIndex === 0 ? 'disabled' : ''}>←</button>
+                    <button onclick="moveButton(${realIndex}, 1, event)" title="Move Right / Down"
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs disabled:opacity-30" ${realIndex === appState.buttons.length - 1 ? 'disabled' : ''}>→</button>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button onclick="openButtonModal('${btn.id}', event)" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold">
+                      Edit
+                    </button>
+                    <button onclick="requestDeleteButton('${btn.id}', event)" title="Delete Button"
+                      class="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs">
+                      🗑
+                    </button>
+                  </div>
+                `}
+              </div>
+            ` : `
+              <div class="pt-2 border-t border-slate-800/70 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span id="dot-${btn.id}" class="w-2 h-2 rounded-full ${accent.dot} opacity-75 shrink-0"></span>
+                  <span id="status-${btn.id}" class="text-[11px] font-mono text-slate-400 truncate">
+                    ${btn.lastTriggered ? `Last: ${btn.lastTriggered}` : 'Tap to trigger'}
+                  </span>
+                </div>
+                <span class="text-[11px] text-slate-500 font-mono">▶</span>
+              </div>
+            `}
+
+            <!-- Subtle Bottom Accent Glow Bar -->
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${accent.bar} opacity-75"></div>
+          </div>
+        `;
+      }).join('');
+
+      // Append an "+ Add New Routine" tile when in Edit Mode or when grid is empty
+      const addCardHtml = (appState.editMode || filtered.length === 0) ? `
+        <button onclick="openButtonModal()"
+          class="rounded-2xl border-2 border-dashed border-slate-700 hover:border-cyan-400/70 bg-slate-900/40 hover:bg-slate-900/80 p-4 flex flex-col items-center justify-center gap-2 min-h-[148px] sm:min-h-[162px] text-slate-400 hover:text-cyan-300 transition group">
+          <div class="w-11 h-11 rounded-xl bg-slate-800/90 group-hover:bg-cyan-500/20 border border-slate-700 group-hover:border-cyan-500/40 flex items-center justify-center text-2xl transition">
+            ＋
+          </div>
+          <span class="text-xs sm:text-sm font-bold">Add Routine Button</span>
+          <span class="text-[11px] text-slate-500">Voice Monkey or URL Trigger</span>
+        </button>
+      ` : '';
+
+      grid.innerHTML = cardsHtml + addCardHtml;
+    }
+
+    /*************************************************************************
+     * 5. TRIGGERING ALEXA ROUTINES (WITH NO-CORS FALLBACK)
+     *************************************************************************/
+    async function triggerRoutineButton(buttonId) {
+      const btn = appState.buttons.find(b => b.id === buttonId);
+      if (!btn) return;
+
+      playTactileClick('press');
+
+      // Visual pulse animation on tile
+      const tileEl = document.getElementById(`tile-${btn.id}`);
+      const statusEl = document.getElementById(`status-${btn.id}`);
+      const dotEl = document.getElementById(`dot-${btn.id}`);
+
+      if (tileEl) {
+        tileEl.classList.remove('tile-firing');
+        void tileEl.offsetWidth; // Reflow to restart keyframe animation
+        tileEl.classList.add('tile-firing');
+      }
+
+      if (statusEl) {
+        statusEl.textContent = 'Sending webhook...';
+        statusEl.classList.add('text-cyan-300');
+      }
+      if (dotEl) {
+        dotEl.classList.add('animate-ping');
+      }
+
+      // Build the endpoint URL based on selected provider
+      let finalUrl = '';
+      let isDemoSimulation = false;
+
+      if (btn.provider === 'voicemonkey') {
+        const token = (appState.vmToken || '').trim();
+        const deviceId = (btn.target || '').trim();
+        if (!token || deviceId.startsWith('demo-')) {
+          isDemoSimulation = true;
+          finalUrl = `https://api-v3.voicemonkey.io/trigger?token=${token ? '••••' : 'YOUR_VM_TOKEN'}&device=${encodeURIComponent(deviceId)}`;
+        } else {
+          finalUrl = `https://api-v3.voicemonkey.io/trigger?token=${encodeURIComponent(token)}&device=${encodeURIComponent(deviceId)}&_t=${Date.now()}`;
+        }
+      } else if (btn.provider === 'virtualbutton') {
+        const code = (appState.vbAccessCode || '').trim();
+        const btnNum = (btn.target || '1').trim();
+        if (!code) {
+          isDemoSimulation = true;
+          finalUrl = `https://api.virtualbuttons.com/v1?virtualButton=${encodeURIComponent(btnNum)}&accessCode=YOUR_ACCESS_CODE`;
+        } else {
+          finalUrl = `https://api.virtualbuttons.com/v1?virtualButton=${encodeURIComponent(btnNum)}&accessCode=${encodeURIComponent(code)}&_t=${Date.now()}`;
+        }
+      } else {
+        // URL Routine Trigger or Custom Direct Webhook
+        const rawUrl = (btn.target || '').trim();
+        if (!rawUrl || rawUrl.includes('DEMO_')) {
+          isDemoSimulation = true;
+          finalUrl = rawUrl || 'https://www.virtualsmarthome.xyz/url_routine_trigger/activate.php?trigger=DEMO';
+        } else {
+          const separator = rawUrl.includes('?') ? '&' : '?';
+          finalUrl = `${rawUrl}${separator}_t=${Date.now()}`;
+        }
+      }
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      try {
+        if (isDemoSimulation) {
+          // Simulate brief network hop for demo buttons
+          await new Promise(r => setTimeout(r, 240));
+          btn.lastTriggered = timeStr;
+          saveState();
+          addLogEntry(btn.label, maskSensitiveUrl(finalUrl), 'DEMO ✓');
+          showToast(`Triggered "${btn.label}" (Demo Mode — click Edit to add your live ID/URL)`, 'info');
+        } else {
+          // Dispatch real HTTP GET request with mode: 'no-cors' so local HTML files never fail due to CORS blocks
+          await fetch(finalUrl, {
+            method: 'GET',
+            mode: 'no-cors',
+            cache: 'no-store'
+          });
+          btn.lastTriggered = timeStr;
+          saveState();
+          addLogEntry(btn.label, maskSensitiveUrl(finalUrl), 'SENT ✓');
+          showToast(`Routine "${btn.label}" triggered!`, 'success');
+        }
+
+        if (statusEl) {
+          statusEl.textContent = `Triggered ✓ ${timeStr}`;
+        }
+      } catch (err) {
+        console.error('Webhook trigger error:', err);
+        addLogEntry(btn.label, maskSensitiveUrl(finalUrl), 'ERROR');
+        if (statusEl) {
+          statusEl.textContent = 'Network Error';
+          statusEl.classList.replace('text-cyan-300', 'text-rose-400');
+        }
+        showToast(`Failed to reach webhook for "${btn.label}"`, 'error');
+      } finally {
+        if (dotEl) {
+          dotEl.classList.remove('animate-ping');
+        }
+        setTimeout(() => {
+          if (statusEl) {
+            statusEl.classList.remove('text-cyan-300', 'text-rose-400');
+            statusEl.textContent = `Last: ${timeStr}`;
+          }
+        }, 1800);
+      }
+    }
+
+    function maskSensitiveUrl(url) {
+      return url
+        .replace(/(token=)[^&]+/gi, '$1••••••')
+        .replace(/(accessCode=)[^&]+/gi, '$1••••••');
+    }
+
+    /*************************************************************************
+     * 6. VOICE MONKEY LIVE TTS ANNOUNCER BAR
+     *************************************************************************/
+    function toggleTTSPanel() {
+      appState.ttsOpen = !appState.ttsOpen;
+      saveState();
+      renderTTSBar();
+    }
+
+    function renderTTSBar() {
+      const drawer = document.getElementById('ttsDrawer');
+      const toggleBtn = document.getElementById('btnToggleTTS');
+      const select = document.getElementById('ttsSpeakerSelect');
+      const customInput = document.getElementById('ttsCustomSpeakerInput');
+
+      if (appState.ttsOpen) {
+        drawer.classList.remove('hidden');
+        toggleBtn.classList.add('border-violet-500/70', 'bg-violet-500/15', 'text-violet-200');
+      } else {
+        drawer.classList.add('hidden');
+        toggleBtn.classList.remove('border-violet-500/70', 'bg-violet-500/15', 'text-violet-200');
+      }
+
+      // Populate Speaker Dropdown
+      const options = appState.speakers.map(sp => `
+        <option value="${escapeHtml(sp.id)}" ${sp.id === appState.selectedSpeakerId ? 'selected' : ''}>
+          🔊 ${escapeHtml(sp.name)} (${escapeHtml(sp.id)})
+        </option>
+      `);
+      options.push(`<option value="__custom__" ${appState.selectedSpeakerId === '__custom__' ? 'selected' : ''}>✍️ Custom Device ID...</option>`);
+      select.innerHTML = options.join('');
+
+      if (appState.selectedSpeakerId === '__custom__') {
+        customInput.classList.remove('hidden');
+      } else {
+        customInput.classList.add('hidden');
+      }
+    }
+
+    function handleSpeakerSelectChange() {
+      const select = document.getElementById('ttsSpeakerSelect');
+      appState.selectedSpeakerId = select.value;
+      saveState();
+      renderTTSBar();
+    }
+
+    function fillAndSendTTS(phrase) {
+      const input = document.getElementById('ttsSpeechInput');
+      input.value = phrase;
+      sendTTSAnnouncement();
+    }
+
+    async function sendTTSAnnouncement() {
+      const speechInput = document.getElementById('ttsSpeechInput');
+      const text = (speechInput.value || '').trim();
+      if (!text) {
+        showToast('Please enter a message for Alexa to announce.', 'error');
+        speechInput.focus();
+        return;
+      }
+
+      const speakerId = appState.selectedSpeakerId === '__custom__'
+        ? (document.getElementById('ttsCustomSpeakerInput').value || '').trim()
+        : appState.selectedSpeakerId;
+
+      if (!speakerId) {
+        showToast('Please select or enter an Echo Speaker Device ID.', 'error');
+        return;
+      }
+
+      playTactileClick('tts');
+      const token = (appState.vmToken || '').trim();
+      const encodedSpeech = encodeURIComponent(text);
+      const btn = document.getElementById('btnSendTTS');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = `<span>Broadcasting...</span>`;
+
+      const endpoint = `https://api-v3.voicemonkey.io/announce?token=${token ? encodeURIComponent(token) : 'YOUR_VM_TOKEN'}&device=${encodeURIComponent(speakerId)}&speech=${encodedSpeech}`;
+
+      try {
+        if (!token) {
+          await new Promise(r => setTimeout(r, 300));
+          addLogEntry(`TTS → ${speakerId}`, maskSensitiveUrl(endpoint), 'DEMO TTS');
+          showToast(`Demo TTS Broadcast: "${text}" (Add your Voice Monkey v3 Token in ⚙️ Settings for live speech)`, 'info');
+        } else {
+          await fetch(`${endpoint}&_t=${Date.now()}`, {
+            method: 'GET',
+            mode: 'no-cors',
+            cache: 'no-store'
+          });
+          addLogEntry(`TTS → ${speakerId}`, maskSensitiveUrl(endpoint), 'SPOKEN ✓');
+          showToast(`Announced on ${speakerId}: "${text}"`, 'success');
+        }
+        speechInput.value = '';
+      } catch (err) {
+        addLogEntry(`TTS → ${speakerId}`, maskSensitiveUrl(endpoint), 'ERROR');
+        showToast('Failed to send Voice Monkey TTS announcement.', 'error');
+      } finally {
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+        }, 400);
+      }
+    }
+
+    /*************************************************************************
+     * 7. EDIT MODE & BUTTON CRUD MANAGEMENT
+     *************************************************************************/
+    function toggleEditMode() {
+      appState.editMode = !appState.editMode;
+      pendingDeleteId = null;
+
+      const banner = document.getElementById('editModeBanner');
+      const editBtn = document.getElementById('btnEditMode');
+      const label = document.getElementById('editModeLabel');
+
+      if (appState.editMode) {
+        banner.classList.remove('hidden');
+        editBtn.classList.add('border-amber-500/80', 'bg-amber-500/20', 'text-amber-200');
+        label.textContent = 'Done';
+      } else {
+        banner.classList.add('hidden');
+        editBtn.classList.remove('border-amber-500/80', 'bg-amber-500/20', 'text-amber-200');
+        label.textContent = 'Edit';
+      }
+
+      renderRemoteGrid();
+    }
+
+    function moveButton(index, direction, event) {
+      if (event) event.stopPropagation();
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= appState.buttons.length) return;
+      const temp = appState.buttons[index];
+      appState.buttons[index] = appState.buttons[targetIndex];
+      appState.buttons[targetIndex] = temp;
+      saveState();
+      renderRemoteGrid();
+    }
+
+    function requestDeleteButton(buttonId, event) {
+      if (event) event.stopPropagation();
+      pendingDeleteId = buttonId;
+      renderRemoteGrid();
+    }
+
+    function cancelDeleteButton(event) {
+      if (event) event.stopPropagation();
+      pendingDeleteId = null;
+      renderRemoteGrid();
+    }
+
+    function confirmDeleteButton(buttonId, event) {
+      if (event) event.stopPropagation();
+      const btn = appState.buttons.find(b => b.id === buttonId);
+      appState.buttons = appState.buttons.filter(b => b.id !== buttonId);
+      pendingDeleteId = null;
+      saveState();
+      renderAll();
+      showToast(`Deleted button "${btn ? btn.label : ''}"`, 'info');
+    }
+
+    function openButtonModal(buttonId = null, event = null) {
+      if (event) event.stopPropagation();
+      const modalTitle = document.getElementById('buttonModalTitle');
+      const idInput = document.getElementById('btnIdInput');
+      const labelInput = document.getElementById('btnLabelInput');
+      const categoryInput = document.getElementById('btnCategoryInput');
+      const iconInput = document.getElementById('btnIconInput');
+      const subtitleInput = document.getElementById('btnSubtitleInput');
+      const targetInput = document.getElementById('btnTargetInput');
+
+      if (buttonId) {
+        const existing = appState.buttons.find(b => b.id === buttonId);
+        if (!existing) return;
+        modalTitle.textContent = 'Edit Routine Button';
+        idInput.value = existing.id;
+        labelInput.value = existing.label;
+        categoryInput.value = existing.category || 'General';
+        iconInput.value = existing.icon || '⚡';
+        subtitleInput.value = existing.subtitle || '';
+        selectAccentColor(existing.accent || 'cyan');
+        selectProviderType(existing.provider || 'voicemonkey');
+        targetInput.value = existing.target || '';
+      } else {
+        modalTitle.textContent = 'Add New Routine Button';
+        idInput.value = '';
+        labelInput.value = '';
+        categoryInput.value = appState.activeCategory === 'All' ? 'Lighting' : appState.activeCategory;
+        iconInput.value = '⚡';
+        subtitleInput.value = '';
+        selectAccentColor('cyan');
+        selectProviderType('urltrigger');
+        targetInput.value = '';
+      }
+
+      openModal('buttonModal');
+    }
+
+    function setEmoji(emoji) {
+      document.getElementById('btnIconInput').value = emoji;
+    }
+
+    function selectAccentColor(color) {
+      document.getElementById('btnAccentInput').value = color;
+      document.querySelectorAll('.accent-choice').forEach(btn => {
+        if (btn.dataset.color === color) {
+          btn.classList.add('ring-2', 'ring-white', 'scale-105');
+        } else {
+          btn.classList.remove('ring-2', 'ring-white', 'scale-105');
+        }
+      });
+    }
+
+    function selectProviderType(provider) {
+      document.getElementById('btnProviderInput').value = provider;
+      const providers = ['voicemonkey', 'urltrigger', 'virtualbutton'];
+      providers.forEach(p => {
+        const tab = document.getElementById(`provTab_${p}`);
+        if (p === provider) {
+          tab.className = 'py-2.5 px-2 rounded-xl border border-cyan-400 bg-cyan-500/20 text-cyan-200 text-xs font-bold transition flex flex-col items-center gap-0.5 shadow-inner';
+        } else {
+          tab.className = 'py-2.5 px-2 rounded-xl border border-slate-700 bg-slate-950 text-slate-400 hover:text-slate-200 text-xs font-semibold transition flex flex-col items-center gap-0.5';
+        }
+      });
+
+      const labelEl = document.getElementById('targetFieldLabel');
+      const inputEl = document.getElementById('btnTargetInput');
+      const helpEl = document.getElementById('targetFieldHelp');
+      const extractBtn = document.getElementById('btnExtractUrlHelper');
+
+      if (provider === 'voicemonkey') {
+        labelEl.textContent = 'Voice Monkey Trigger Device ID *';
+        inputEl.placeholder = 'e.g., study-lights-2k8d1';
+        helpEl.textContent = 'Uses your global Voice Monkey v3 API Token from Settings. Only enter the Monkey/Trigger Device ID here.';
+        extractBtn.classList.add('hidden');
+      } else if (provider === 'virtualbutton') {
+        labelEl.textContent = 'Virtual Button Number (1 - 99) *';
+        inputEl.placeholder = 'e.g., 1';
+        helpEl.textContent = 'Uses your Virtual Buttons Access Code from Settings and triggers https://api.virtualbuttons.com/v1.';
+        extractBtn.classList.add('hidden');
+      } else {
+        labelEl.textContent = 'URL Routine Trigger / Full Webhook URL *';
+        inputEl.placeholder = 'https://www.virtualsmarthome.xyz/url_routine_trigger/activate.php?trigger=...';
+        helpEl.textContent = 'Paste your full Activate URL from Virtual Smart Home (URL Routine Trigger) or any custom GET webhook.';
+        extractBtn.classList.remove('hidden');
+      }
+    }
+
+    function extractUrlFromInput() {
+      const input = document.getElementById('btnTargetInput');
+      const match = (input.value || '').match(/https?:\/\/[^\s"'<>]+/i);
+      if (match) {
+        input.value = match[0];
+        showToast('Extracted clean URL!', 'success');
+      } else {
+        showToast('No http/https URL found in the field.', 'info');
+      }
+    }
+
+    function saveButtonForm(event) {
+      event.preventDefault();
+      const id = document.getElementById('btnIdInput').value;
+      const label = document.getElementById('btnLabelInput').value.trim();
+      const category = document.getElementById('btnCategoryInput').value.trim() || 'General';
+      const icon = document.getElementById('btnIconInput').value.trim() || '⚡';
+      const subtitle = document.getElementById('btnSubtitleInput').value.trim();
+      const accent = document.getElementById('btnAccentInput').value || 'cyan';
+      const provider = document.getElementById('btnProviderInput').value || 'urltrigger';
+      let target = document.getElementById('btnTargetInput').value.trim();
+
+      // If user pasted a full Voice Monkey trigger URL into the Voice Monkey Device ID box, smartly extract the device param!
+      if (provider === 'voicemonkey' && target.includes('voicemonkey.io')) {
+        try {
+          const parsedUrl = new URL(target);
+          const extractedDevice = parsedUrl.searchParams.get('device');
+          const extractedToken = parsedUrl.searchParams.get('token');
+          if (extractedDevice) target = extractedDevice;
+          if (extractedToken && !appState.vmToken) {
+            appState.vmToken = extractedToken;
+          }
+        } catch (e) {}
+      }
+
+      if (id) {
+        const index = appState.buttons.findIndex(b => b.id === id);
+        if (index !== -1) {
+          appState.buttons[index] = {
+            ...appState.buttons[index],
+            label,
+            category,
+            icon,
+            subtitle,
+            accent,
+            provider,
+            target
+          };
+        }
+        showToast(`Updated "${label}"`, 'success');
+      } else {
+        const newBtn = {
+          id: 'btn-' + Date.now(),
+          label,
+          category,
+          icon,
+          subtitle,
+          accent,
+          provider,
+          target,
+          lastTriggered: null
+        };
+        appState.buttons.push(newBtn);
+        showToast(`Added "${label}" to remote`, 'success');
+      }
+
+      saveState();
+      closeModal('buttonModal');
+      renderAll();
+    }
+
+    /*************************************************************************
+     * 8. GLOBAL SETTINGS, SPEAKER PRESETS & JSON IMPORT/EXPORT
+     *************************************************************************/
+    function openSettingsModal() {
+      document.getElementById('settingsVmToken').value = appState.vmToken || '';
+      document.getElementById('settingsVbAccessCode').value = appState.vbAccessCode || '';
+      document.getElementById('resetConfirmBox').classList.add('hidden');
+      renderSavedSpeakersList();
+      openModal('settingsModal');
+    }
+
+    function renderSavedSpeakersList() {
+      const container = document.getElementById('savedSpeakersList');
+      if (!appState.speakers || appState.speakers.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 italic">No saved speakers yet. Add one below.</p>`;
+        return;
+      }
+
+      container.innerHTML = appState.speakers.map((sp, idx) => `
+        <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+          <div class="truncate">
+            <span class="font-semibold text-slate-200">${escapeHtml(sp.name)}</span>
+            <span class="ml-2 font-mono text-violet-300">${escapeHtml(sp.id)}</span>
+          </div>
+          <button type="button" onclick="removeSavedSpeaker(${idx})" class="text-rose-400 hover:text-rose-300 px-2">
+            Remove
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function addSavedSpeaker() {
+      const nameInput = document.getElementById('newSpeakerName');
+      const idInput = document.getElementById('newSpeakerId');
+      const name = nameInput.value.trim();
+      const id = idInput.value.trim();
+
+      if (!name || !id) {
+        showToast('Enter both a Speaker Name and Voice Monkey Device ID.', 'error');
+        return;
+      }
+
+      appState.speakers.push({ name, id });
+      appState.selectedSpeakerId = id;
+      nameInput.value = '';
+      idInput.value = '';
+      saveState();
+      renderSavedSpeakersList();
+      renderTTSBar();
+      showToast(`Added speaker "${name}"`, 'success');
+    }
+
+    function removeSavedSpeaker(index) {
+      appState.speakers.splice(index, 1);
+      if (appState.speakers.length > 0) {
+        appState.selectedSpeakerId = appState.speakers[0].id;
+      } else {
+        appState.selectedSpeakerId = '__custom__';
+      }
+      saveState();
+      renderSavedSpeakersList();
+      renderTTSBar();
+    }
+
+    function saveGlobalSettings() {
+      appState.vmToken = document.getElementById('settingsVmToken').value.trim();
+      appState.vbAccessCode = document.getElementById('settingsVbAccessCode').value.trim();
+      saveState();
+      closeModal('settingsModal');
+      renderAll();
+      showToast('Global API settings saved to localStorage!', 'success');
+    }
+
+    function togglePasswordVisibility(inputId) {
+      const input = document.getElementById(inputId);
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    function exportConfigFile() {
+      const payload = JSON.stringify({
+        exportedAt: new Date().toISOString(),
+        vmToken: appState.vmToken,
+        vbAccessCode: appState.vbAccessCode,
+        speakers: appState.speakers,
+        buttons: appState.buttons
+      }, null, 2);
+
+      const blob = new Blob([payload], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `alexa-remote-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloaded remote configuration JSON!', 'success');
+    }
+
+    function copyConfigToClipboard() {
+      const payload = JSON.stringify({
+        vmToken: appState.vmToken,
+        vbAccessCode: appState.vbAccessCode,
+        speakers: appState.speakers,
+        buttons: appState.buttons
+      }, null, 2);
+
+      const textarea = document.createElement('textarea');
+      textarea.value = payload;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Configuration JSON copied to clipboard!', 'success');
+      } catch (err) {
+        showToast('Unable to copy to clipboard.', 'error');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function importConfigFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (Array.isArray(imported.buttons)) {
+            appState.buttons = imported.buttons;
+          }
+          if (Array.isArray(imported.speakers)) {
+            appState.speakers = imported.speakers;
+          }
+          if (typeof imported.vmToken === 'string') {
+            appState.vmToken = imported.vmToken;
+          }
+          if (typeof imported.vbAccessCode === 'string') {
+            appState.vbAccessCode = imported.vbAccessCode;
+          }
+          saveState();
+          closeModal('settingsModal');
+          renderAll();
+          showToast('Remote configuration imported!', 'success');
+        } catch (err) {
+          showToast('Invalid JSON backup file.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetToDefaultsConfirm() {
+      document.getElementById('resetConfirmBox').classList.remove('hidden');
+    }
+
+    function confirmResetDefaults() {
+      const baked = getBakedConfig();
+      appState.buttons = JSON.parse(JSON.stringify(baked && Array.isArray(baked.buttons) ? baked.buttons : DEFAULT_BUTTONS));
+      appState.speakers = JSON.parse(JSON.stringify(baked && Array.isArray(baked.speakers) ? baked.speakers : DEFAULT_SPEAKERS));
+      appState.activeCategory = 'All';
+      saveState();
+      document.getElementById('resetConfirmBox').classList.add('hidden');
+      closeModal('settingsModal');
+      renderAll();
+      showToast('Restored default routine buttons.', 'info');
+    }
+
+    /*************************************************************************
+     * 8B. GITHUB PAGES & PWA EXPORT KIT + INSTALLABLE PWA ENGINE
+     *************************************************************************/
+    const PWA_ICON_SVG_DATA_URI = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%230b1120'/%3E%3Ccircle cx='256' cy='256' r='168' fill='none' stroke='%2306b6d4' stroke-width='36'/%3E%3Ccircle cx='256' cy='256' r='56' fill='%2338bdf8'/%3E%3C/svg%3E";
+
+    function buildManifestObject() {
+      return {
+        id: "./",
+        name: "Alexa Routine Remote — Command Deck",
+        short_name: "Alexa Deck",
+        description: "Standalone Alexa Routine & Voice Monkey TTS Remote Control",
+        start_url: "./",
+        scope: "./",
+        display: "standalone",
+        orientation: "portrait-primary",
+        background_color: "#0b1120",
+        theme_color: "#0b1120",
+        categories: ["utilities", "lifestyle", "productivity"],
+        prefer_related_applications: false,
+        icons: [
+          {
+            src: PWA_ICON_SVG_DATA_URI,
+            sizes: "192x192",
+            type: "image/svg+xml",
+            purpose: "any"
+          },
+          {
+            src: PWA_ICON_SVG_DATA_URI,
+            sizes: "512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }
+        ]
+      };
+    }
+
+    function buildServiceWorkerSource() {
+      return `// Alexa Routine Remote — Offline Service Worker (GitHub Pages Subfolder Ready)
+const CACHE_NAME = 'alexa-routine-deck-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(() => {})
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  // Never cache live webhook API calls
+  if (
+    url.hostname.includes('voicemonkey.io') ||
+    url.hostname.includes('virtualsmarthome.xyz') ||
+    url.hostname.includes('virtualbuttons.com')
+  ) {
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      return (
+        cached ||
+        fetch(event.request).catch(() => caches.match('./index.html'))
+      );
+    })
+  );
+});
+`;
+    }
+
+    function initPwaSupport() {
+      // 1. Register ./sw.js when hosted over HTTP/HTTPS (e.g., GitHub Pages)
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {
+          // If ./sw.js isn't uploaded yet, fallback silently
+        });
+      }
+
+      // 2. If ./manifest.json isn't present yet (e.g., previewing single file), attach inline manifest blob fallback
+      fetch('./manifest.json', { method: 'HEAD' }).then((res) => {
+        if (!res.ok) attachInlineManifestFallback();
+      }).catch(() => {
+        attachInlineManifestFallback();
+      });
+
+      // 3. Listen for Chrome/Edge/Android beforeinstallprompt
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        const btn = document.getElementById('btnInstallPwa');
+        if (btn) btn.classList.remove('hidden');
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        const btn = document.getElementById('btnInstallPwa');
+        if (btn) btn.classList.add('hidden');
+        showToast('Alexa Routine Deck installed as a standalone app!', 'success');
+      });
+    }
+
+    function attachInlineManifestFallback() {
+      try {
+        const blob = new Blob([JSON.stringify(buildManifestObject(), null, 2)], { type: 'application/manifest+json' });
+        const link = document.getElementById('pwaManifestLink');
+        if (link) link.href = URL.createObjectURL(blob);
+      } catch (e) {}
+    }
+
+    async function triggerPwaInstall() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+          deferredInstallPrompt = null;
+          document.getElementById('btnInstallPwa').classList.add('hidden');
+        }
+      } else {
+        openGithubModal();
+        showToast('Use your browser menu → "Add to Home screen" or deploy via GitHub Pages.', 'info');
+      }
+    }
+
+    function openGithubModal() {
+      setExportSecurityMode(document.getElementById('selectedExportMode').value || 'public');
+      openModal('githubModal');
+    }
+
+    function setExportSecurityMode(mode) {
+      document.getElementById('selectedExportMode').value = mode;
+      const pubCard = document.getElementById('exportModePublicCard');
+      const privCard = document.getElementById('exportModePrivateCard');
+      const radios = document.getElementsByName('exportSecMode');
+      radios.forEach(r => { r.checked = (r.value === mode); });
+
+      if (mode === 'public') {
+        pubCard.className = 'cursor-pointer p-3 rounded-xl border border-cyan-400 bg-cyan-500/10 flex flex-col justify-between gap-1.5 transition';
+        privCard.className = 'cursor-pointer p-3 rounded-xl border border-slate-800 bg-slate-900/70 flex flex-col justify-between gap-1.5 transition';
+      } else {
+        pubCard.className = 'cursor-pointer p-3 rounded-xl border border-slate-800 bg-slate-900/70 flex flex-col justify-between gap-1.5 transition';
+        privCard.className = 'cursor-pointer p-3 rounded-xl border border-amber-400 bg-amber-500/10 flex flex-col justify-between gap-1.5 transition';
+      }
+    }
+
+    function triggerTextFileDownload(filename, content, mimeType = 'text/plain;charset=utf-8') {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadBakedIndexHtml() {
+      const mode = document.getElementById('selectedExportMode').value || 'public';
+      const sanitizedButtons = appState.buttons.map(b => {
+        const copy = { ...b, lastTriggered: null };
+        if (mode === 'public' && copy.provider === 'urltrigger' && copy.target && !copy.target.includes('DEMO_')) {
+          // Strip secret token query parameter in Public Repo mode while preserving trigger structure
+          copy.target = copy.target.replace(/([?&]token=)[^&]+/gi, '$1YOUR_TOKEN');
+        }
+        return copy;
+      });
+
+      const bakedPayload = {
+        exportedAt: new Date().toISOString(),
+        securityMode: mode,
+        vmToken: mode === 'private' ? appState.vmToken : '',
+        vbAccessCode: mode === 'private' ? appState.vbAccessCode : '',
+        speakers: appState.speakers,
+        buttons: sanitizedButtons
+      };
+
+      // Clone current DOM and reset transient UI containers so exported index.html is pristine
+      const clone = document.documentElement.cloneNode(true);
+      const bakedScript = clone.querySelector('#bakedConfigData');
+      if (bakedScript) {
+        bakedScript.textContent = JSON.stringify(bakedPayload, null, 2);
+      }
+      const manifestLink = clone.querySelector('#pwaManifestLink');
+      if (manifestLink) {
+        manifestLink.setAttribute('href', './manifest.json');
+      }
+      ['buttonModal', 'settingsModal', 'guideModal', 'githubModal', 'apkModal', 'editModeBanner', 'ttsDrawer', 'btnInstallPwa'].forEach(id => {
+        const el = clone.querySelector('#' + id);
+        if (el) el.classList.add('hidden');
+      });
+      const toastBox = clone.querySelector('#toastContainer');
+      if (toastBox) toastBox.innerHTML = '';
+
+      const htmlOutput = '<!DOCTYPE html>\n' + clone.outerHTML;
+      triggerTextFileDownload('index.html', htmlOutput, 'text/html;charset=utf-8');
+      showToast(`Downloaded index.html (${mode === 'public' ? 'Public Repo Safe Mode' : 'Full Clone Mode'})`, 'success');
+    }
+
+    function downloadManifestJson() {
+      const content = JSON.stringify(buildManifestObject(), null, 2);
+      triggerTextFileDownload('manifest.json', content, 'application/json;charset=utf-8');
+      showToast('Downloaded manifest.json', 'success');
+    }
+
+    function downloadServiceWorkerJs() {
+      const content = buildServiceWorkerSource();
+      triggerTextFileDownload('sw.js', content, 'application/javascript;charset=utf-8');
+      showToast('Downloaded sw.js (Offline Service Worker)', 'success');
+    }
+
+    function downloadAllGithubFiles() {
+      downloadBakedIndexHtml();
+      setTimeout(() => downloadManifestJson(), 250);
+      setTimeout(() => downloadServiceWorkerJs(), 500);
+      showToast('Downloading index.html, manifest.json, and sw.js for GitHub Pages!', 'success');
+    }
+
+    /*************************************************************************
+     * 8C. ANDROID APK BUILDER STUDIO (GITHUB ACTIONS & PWABUILDER)
+     *************************************************************************/
+    function openApkModal() {
+      updateApkYamlPreview();
+      updateAssetLinksPreview();
+      openModal('apkModal');
+    }
+
+    function switchApkTab(tab) {
+      const btnActions = document.getElementById('apkTabBtn_actions');
+      const btnPwa = document.getElementById('apkTabBtn_pwabuilder');
+      const panelActions = document.getElementById('apkTabPanel_actions');
+      const panelPwa = document.getElementById('apkTabPanel_pwabuilder');
+
+      if (tab === 'actions') {
+        btnActions.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 bg-emerald-500 text-slate-950 shadow-md';
+        btnPwa.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 text-slate-300 hover:text-white';
+        panelActions.classList.remove('hidden');
+        panelPwa.classList.add('hidden');
+      } else {
+        btnPwa.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 bg-cyan-500 text-slate-950 shadow-md';
+        btnActions.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 text-slate-300 hover:text-white';
+        panelPwa.classList.remove('hidden');
+        panelActions.classList.add('hidden');
+      }
+    }
+
+    function toggleYamlPreviewBox() {
+      const box = document.getElementById('apkYamlPreviewContainer');
+      const label = document.getElementById('yamlPreviewToggleText');
+      if (box.classList.contains('hidden')) {
+        box.classList.remove('hidden');
+        label.textContent = '🔼 Hide build-apk.yml Code';
+      } else {
+        box.classList.add('hidden');
+        label.textContent = '👁️ View build-apk.yml Code';
+      }
+    }
+
+    function getSanitizedApkParams() {
+      const rawName = (document.getElementById('apkAppNameInput')?.value || 'Alexa Remote').trim();
+      const safeAppName = rawName.replace(/["\\<>]/g, '') || 'Alexa Remote';
+      const rawPkg = (document.getElementById('apkPackageIdInput')?.value || 'com.custom.alexaremote').trim().toLowerCase();
+      const safePkg = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(rawPkg) ? rawPkg : 'com.custom.alexaremote';
+      return { safeAppName, safePkg };
+    }
+
+    function generateGithubActionYaml() {
+      const { safeAppName, safePkg } = getSanitizedApkParams();
+      const pkgPath = safePkg.replace(/\./g, '/');
+
+      return `name: Build Standalone Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Scaffold Native Android WebView Project Around index.html
+        run: |
+          mkdir -p android-app/app/src/main/assets
+          mkdir -p android-app/app/src/main/java/${pkgPath}
+          mkdir -p android-app/app/src/main/res/values
+          mkdir -p android-app/app/src/main/res/drawable
+
+          cp index.html android-app/app/src/main/assets/index.html
+          if [ -f manifest.json ]; then cp manifest.json android-app/app/src/main/assets/; fi
+          if [ -f sw.js ]; then cp sw.js android-app/app/src/main/assets/; fi
+
+          cat << 'EOF' > android-app/settings.gradle
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "AlexaRoutineRemote"
+          include ':app'
+          EOF
+
+          cat << 'EOF' > android-app/build.gradle
+          plugins {
+              id 'com.android.application' version '8.3.0' apply false
+          }
+          EOF
+
+          cat << 'EOF' > android-app/app/build.gradle
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace '${safePkg}'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "${safePkg}"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              buildTypes {
+                  debug {
+                      minifyEnabled false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          dependencies {}
+          EOF
+
+          cat << 'EOF' > android-app/app/src/main/res/drawable/ic_launcher.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path android:fillColor="#0B1120" android:pathData="M0,0h108v108h-108z"/>
+              <path android:fillColor="#00000000" android:strokeColor="#06B6D4" android:strokeWidth="8"
+                  android:pathData="M54,54m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0"/>
+              <path android:fillColor="#38BDF8"
+                  android:pathData="M54,54m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > android-app/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="${safeAppName}"
+                  android:usesCleartextTraffic="true"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat << 'EOF' > android-app/app/src/main/java/${pkgPath}/MainActivity.java
+          package ${safePkg};
+
+          import android.app.Activity;
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.view.Window;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  Window window = getWindow();
+                  window.setStatusBarColor(Color.parseColor("#0B1120"));
+                  window.setNavigationBarColor(Color.parseColor("#0B1120"));
+
+                  webView = new WebView(this);
+                  webView.setBackgroundColor(Color.parseColor("#0B1120"));
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setAllowContentAccess(true);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient());
+                  webView.loadUrl("file:///android_asset/index.html");
+                  setContentView(webView);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+          }
+          EOF
+
+      - name: Compile Debug APK with Gradle
+        working-directory: ./android-app
+        run: gradle assembleDebug --no-daemon
+
+      - name: Prepare Named APK Output
+        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk Alexa-Remote-debug.apk
+
+      - name: Upload Compiled APK to GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alexa-Remote-APK
+          path: Alexa-Remote-debug.apk
+`;
+    }
+
+    function updateApkYamlPreview() {
+      const codeEl = document.getElementById('apkYamlPreviewCode');
+      if (codeEl) {
+        codeEl.textContent = generateGithubActionYaml();
+      }
+    }
+
+    function downloadGithubActionYaml() {
+      const yaml = generateGithubActionYaml();
+      triggerTextFileDownload('build-apk.yml', yaml, 'text/yaml;charset=utf-8');
+      showToast('Downloaded build-apk.yml! Place it in .github/workflows/build-apk.yml', 'success');
+    }
+
+    function copyGithubActionYaml() {
+      const yaml = generateGithubActionYaml();
+      const textarea = document.createElement('textarea');
+      textarea.value = yaml;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Copied build-apk.yml workflow to clipboard!', 'success');
+      } catch (e) {
+        showToast('Failed to copy YAML.', 'error');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function downloadApkConfiguredIndexHtml() {
+      const mode = document.getElementById('apkHtmlSecuritySelect')?.value || 'public';
+      setExportSecurityMode(mode);
+      downloadBakedIndexHtml();
+    }
+
+    function generateAssetLinksJson() {
+      const pkg = (document.getElementById('twaPackageInput')?.value || 'io.github.username.twa').trim();
+      const sha = (document.getElementById('twaSha256Input')?.value || '').trim();
+      const payload = [
+        {
+          relation: ["delegate_permission/common.handle_all_urls"],
+          target: {
+            namespace: "android_app",
+            package_name: pkg || "io.github.username.twa",
+            sha256_cert_fingerprints: [
+              sha || "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5"
+            ]
+          }
+        }
+      ];
+      return JSON.stringify(payload, null, 2);
+    }
+
+    function updateAssetLinksPreview() {
+      const previewEl = document.getElementById('assetLinksPreviewCode');
+      if (previewEl) {
+        previewEl.textContent = generateAssetLinksJson();
+      }
+    }
+
+    function downloadAssetLinksJson() {
+      const content = generateAssetLinksJson();
+      triggerTextFileDownload('assetlinks.json', content, 'application/json;charset=utf-8');
+      showToast('Downloaded assetlinks.json! Place it in .well-known/assetlinks.json', 'success');
+    }
+
+    function copyAssetLinksJson() {
+      const content = generateAssetLinksJson();
+      const textarea = document.createElement('textarea');
+      textarea.value = content;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Copied assetlinks.json to clipboard!', 'success');
+      } catch (e) {
+        showToast('Failed to copy assetlinks.json', 'error');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    /*************************************************************************
+     * 9. ACTIVITY LOG, MODALS & TOAST HELPERS
+     *************************************************************************/
+    function addLogEntry(source, detail, status) {
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      appState.activityLog.unshift({ time, source, detail, status });
+      if (appState.activityLog.length > 25) {
+        appState.activityLog.pop();
+      }
+      saveState();
+      renderActivityLog();
+    }
+
+    function clearActivityLog() {
+      appState.activityLog = [];
+      addLogEntry('SYS', 'Log cleared.', 'READY');
+    }
+
+    function renderActivityLog() {
+      const list = document.getElementById('activityLogList');
+      if (!list) return;
+      list.innerHTML = appState.activityLog.map(item => {
+        const badgeColor = item.status.includes('ERROR')
+          ? 'text-rose-400 bg-rose-500/10'
+          : item.status.includes('DEMO')
+          ? 'text-amber-300 bg-amber-500/10'
+          : 'text-emerald-300 bg-emerald-500/10';
+        return `
+          <div class="px-4 py-2 flex items-center justify-between gap-3 hover:bg-slate-800/40">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="text-slate-500 shrink-0">${escapeHtml(item.time)}</span>
+              <span class="font-semibold text-slate-200 shrink-0">${escapeHtml(item.source)}</span>
+              <span class="text-slate-400 truncate">${escapeHtml(item.detail)}</span>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${badgeColor}">
+              ${escapeHtml(item.status)}
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const colors = {
+        success: 'bg-slate-900/95 border-emerald-500/60 text-emerald-200',
+        error: 'bg-slate-900/95 border-rose-500/60 text-rose-200',
+        info: 'bg-slate-900/95 border-cyan-500/50 text-slate-100'
+      };
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-xl backdrop-blur-md text-xs sm:text-sm font-medium flex items-center justify-between gap-3 transition-all duration-200 ${colors[type] || colors.info}`;
+      toast.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white text-xs">✕</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        if (toast.parentElement) toast.remove();
+      }, 3600);
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Initialize Application on Load
+    window.onload = function() {
+      loadState();
+      renderAll();
+      initPwaSupport();
+    };
+  </script>
+</body>
+</html>
